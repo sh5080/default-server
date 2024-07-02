@@ -2,120 +2,86 @@ import {
   Controller,
   Post,
   Body,
-  Res,
   Req,
   ValidationPipe,
   Get,
   UseGuards,
-} from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
-import { successCode } from '../middlewares/error.middleware';
-import { AuthService } from '../auth/auth.service';
-import { AuthRequest } from '../type/request.type';
-import { authConfig } from 'src/config/env.config';
-import { UserLoginDto } from './dto/auth.dto';
-import { AuthGuard } from './auth.guard';
+  HttpStatus,
+  Patch,
+} from "@nestjs/common";
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from "@nestjs/swagger";
 
-@ApiTags('로그인')
-@Controller('api/auth')
+import { AuthService } from "../auth/auth.service";
+import { AuthRequest } from "../types/request.type";
+import { UserLoginDto } from "./dto/auth.dto";
+import { AuthGuard } from "./auth.guard";
+import { SwaggerResponse } from "src/utils/swagger.util";
+import { generateBigint } from "src/utils/swaggerExample.util";
+
+@ApiTags("로그인")
+@Controller("api/auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @ApiOperation({
-    summary: '로그인 예시',
-  })
-  @ApiOkResponse({
-    description: '로그인',
-    schema: {
-      example: {
-        statusCode: 200,
-        message: 'Login Success',
-        data: '',
-      },
-    },
-  })
-  @Post('/login')
+  @ApiOperation({ summary: "로그인 예시" })
+  @ApiOkResponse(SwaggerResponse.custom("로그인 성공", 200, "Login Success"))
+  @Post("/login")
   async login(
     @Body(ValidationPipe) userLoginDto: UserLoginDto,
     @Req()
-    req: AuthRequest,
-    @Res()
-    res: Response,
+    req: AuthRequest
   ) {
-    try {
-      const ip = req.ip;
-      const userAgent = req.get('User-Agent');
-      const tokens = await this.authService.login(userLoginDto, ip, userAgent);
+    const ip = req.ip;
+    const userAgent = req.get("User-Agent");
+    const result = await this.authService.login(userLoginDto, ip, userAgent);
 
-      const accessEnv = authConfig().ACCESS_JWT_EXPIRATION;
-      const refreshEnv = authConfig().REFRESH_JWT_EXPIRATION;
-
-      const now = new Date();
-      const accessExp = new Date(now.getTime() + accessEnv * 1000);
-      const refreshExp = new Date(now.getTime() + refreshEnv * 1000);
-
-      const accessOptions: {
-        expires: Date;
-        httpOnly: boolean;
-        secure?: boolean | undefined;
-      } = {
-        expires: accessExp,
-        httpOnly: true,
-      };
-
-      const refreshOptions: {
-        expires: Date;
-        httpOnly: boolean;
-        secure?: boolean | undefined;
-      } = {
-        expires: refreshExp,
-        httpOnly: true,
-      };
-
-      if (process.env.NODE_ENV === 'production') {
-        accessOptions.secure = true;
-        refreshOptions.secure = true;
-      }
-      // TODO 서비스의 성격에 따라 cookie로 보낼지 body로 보낼지 결정 필요
-      return res
-        .cookie('access', tokens.accessToken, accessOptions)
-        .cookie('refresh', tokens.refreshToken, refreshOptions)
-        .status(successCode.OK)
-        .json(tokens);
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
+    return {
+      accessToken: result.tokenData.accessToken,
+      refreshToken: result.tokenData.refreshToken,
+      statusCode: HttpStatus.OK,
+      data: result.message,
+    };
   }
-  @ApiOperation({
-    summary: '토큰 체크 예시',
-  })
-  @ApiOkResponse({
-    description: '토큰 체크',
-    schema: {
-      example: {
-        statusCode: 200,
-        message: 'Login Success',
-        data: '',
-      },
-    },
-  })
+  @ApiOperation({ summary: "토큰 체크 예시" })
+  @ApiBearerAuth()
+  @ApiOkResponse(SwaggerResponse.read("토큰체크 성공", generateBigint()))
   @UseGuards(AuthGuard)
-  @Get('/token')
+  @Get("/token")
   async token(
     @Req()
-    req: AuthRequest,
-    @Res()
-    res: Response,
+    req: AuthRequest
   ) {
-    try {
-      const userId = req.user.userId;
-      console.log('여기@@ : ', userId);
-      return res.status(successCode.OK).json(userId);
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
+    const { userId } = req.user;
+    return { statusCode: HttpStatus.OK, data: userId };
+  }
+  @ApiOperation({ summary: "로그아웃" })
+  @ApiBearerAuth()
+  @ApiOkResponse(SwaggerResponse.delete("로그아웃 성공"))
+  @UseGuards(AuthGuard)
+  @Post("/logout")
+  async logout(
+    @Req()
+    req: AuthRequest
+  ) {
+    const accessToken = req.headers.authorization.replace("Bearer ", "");
+    await this.authService.setBlacklist(accessToken);
+    return { statusCode: HttpStatus.NO_CONTENT };
+  }
+  @ApiOperation({ summary: "접속기록 저장" })
+  @ApiBearerAuth()
+  @ApiOkResponse(SwaggerResponse.read("접속기록 저장 성공", generateBigint()))
+  @UseGuards(AuthGuard)
+  @Patch("/log")
+  async setLog(@Req() req: AuthRequest) {
+    const { userId } = req.user;
+    const ip = req.ip;
+    const userAgent = req.get("User-Agent");
+    await this.authService.setLog(userId, ip, userAgent);
+    return { statusCode: HttpStatus.OK, data: userId };
   }
 }

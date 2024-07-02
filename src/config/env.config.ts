@@ -13,3 +13,9 @@ export const authConfig = registerAs('auth', () => ({
   ACCESS_JWT_EXPIRATION: parseInt(process.env.ACCESS_JWT_EXPIRATION, 10),
   REFRESH_JWT_EXPIRATION: parseInt(process.env.REFRESH_JWT_EXPIRATION, 10),
 }));
+
+export const redisConfig = registerAs("redis", () => ({
+  REDIS_HOST: process.env.REDIS_HOST,
+  REDIS_PORT: parseInt(process.env.REDIS_PORT, 10),
+  REDIS_PASSWORD: process.env.REDIS_PASSWORD,
+}));

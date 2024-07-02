@@ -7,18 +7,13 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
+    "start:build": "prisma generate && node --max-old-space-size=8192 ./node_modules/.bin/nest build",
+    "start:default": "nest start",
+    "start:dev": "NODE_ENV=development nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
-    "update:dev": "pm2 kill && npm run build && npm run deploy:dev",
-    "deploy:dev": "pm2 start npm run start:prod"
+    "update:prod": "pm2 kill && npm run start:build && export NODE_ENV=deployment && pm2 start dist/main.js && pm2 restart all",
+    "deploy:prod": "pm2 kill && npm run start:build && export NODE_ENV=production && pm2 start dist/main.js && pm2 restart all"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -46,6 +41,7 @@
     "@types/express": "^4.17.17",
     "@types/jest": "^29.5.2",
     "@types/jsonwebtoken": "^9.0.5",
+    "@nestjs-modules/ioredis": "^2.0.1",
     "@types/node": "^20.3.1",
     "@types/supertest": "^2.0.12",
     "@types/uuid": "^9.0.7",
